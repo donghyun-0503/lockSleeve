@@ -286,7 +286,7 @@ func render(image: NSImage, title: String, artist: String, size: NSSize) throws 
         let positioned = scaled.transformed(by: CGAffineTransform(translationX: (size.width - scaled.extent.width) / 2, y: (size.height - scaled.extent.height) / 2))
         let blurred = positioned.clampedToExtent().applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: size.width * 0.085]).cropped(to: bounds)
         // Broad album-color washes, closer to Music's lyrics background.
-        let luminous = blurred.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1.12, kCIInputBrightnessKey: 0.055, kCIInputContrastKey: 0.92])
+        let luminous = blurred.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 2.3, kCIInputBrightnessKey: 0.055, kCIInputContrastKey: 0.92])
         if let cg = CIContext().createCGImage(luminous, from: bounds) { NSImage(cgImage: cg, size: size).draw(in: bounds) }
     }
     NSColor.black.withAlphaComponent(0.20).setFill(); bounds.fill()
