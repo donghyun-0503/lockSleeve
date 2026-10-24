@@ -3,7 +3,7 @@ set -eu
 cd "${0:A:h}/.."
 APP="$PWD/build/LockSleeve.app"
 mkdir -p "$APP/Contents/MacOS" "$PWD/build/module-cache"
-xcrun swiftc Sources/main.swift Sources/WallpaperStore.swift -o "$APP/Contents/MacOS/LockSleeve" -module-cache-path "$PWD/build/module-cache" -framework AppKit -framework CoreImage -O
+xcrun swiftc Sources/main.swift Sources/WallpaperStore.swift Sources/Lyrics.swift Sources/LyricsLayout.swift -o "$APP/Contents/MacOS/LockSleeve" -module-cache-path "$PWD/build/module-cache" -framework AppKit -framework CoreImage -O
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

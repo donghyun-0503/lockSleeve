@@ -20,6 +20,11 @@ func property(_ name: String, in value: Any, depth: Int = 0) -> Any? {
 final class Surface {
     let context: CAContext
     let root = CALayer()
+    let lyricClip = CALayer()
+    var rows: [Int: CATextLayer] = [:]
+    var previousLyrics: LyricsFrame?
+    var previousSize: CGSize = .zero
+    var lyricsVisible = false
     init?(size: CGSize, scale: CGFloat, display: UInt32?) {
         let raw: Any? = display.map { CAContext.remoteContext(withOptions: ["displayId": $0]) } ?? CAContext.remoteContext()
         guard let context = raw as? CAContext, context.contextId != 0 else { return nil }
@@ -28,6 +33,59 @@ final class Surface {
         root.contentsScale = scale
         root.contentsGravity = .resizeAspectFill
         context.layer = root
+        root.addSublayer(lyricClip)
+    }
+    func showLyrics(_ state: LyricsFrame?, visible: Bool) {
+        let size = root.bounds.size
+        guard state != previousLyrics || size != previousSize || visible != lyricsVisible else { return }
+        let previous = previousLyrics
+        let wasVisible = lyricsVisible
+        let sameSize = previousSize == size
+        previousLyrics = state; previousSize = size; lyricsVisible = visible
+        CATransaction.begin(); CATransaction.setDisableActions(true)
+        lyricClip.isHidden = !visible || state?.texts.isEmpty != false
+        let area = LyricsLayout.area(size)
+        lyricClip.frame = area
+        let mask = CAGradientLayer()
+        mask.frame = lyricClip.bounds
+        mask.colors = [NSColor.clear.cgColor, NSColor.white.cgColor, NSColor.white.cgColor, NSColor.clear.cgColor]
+        mask.locations = [0, 0.10, 0.90, 1]
+        mask.startPoint = CGPoint(x: 0.5, y: 0); mask.endPoint = CGPoint(x: 0.5, y: 1)
+        lyricClip.mask = mask
+        guard let state, visible else { CATransaction.commit(); return }
+        let animate = wasVisible && sameSize && previous?.trackID == state.trackID
+            && abs((previous?.activeIndex ?? -100) - state.activeIndex) == 1
+            && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        if previous?.trackID != state.trackID {
+            rows.values.forEach { $0.removeFromSuperlayer() }; rows.removeAll()
+        }
+        let placements = LyricsLayout.placements(state, size: size)
+        let retained = Set(placements.map(\.index))
+        for index in Array(rows.keys) where !retained.contains(index) { rows.removeValue(forKey: index)?.removeFromSuperlayer() }
+        for placement in placements {
+            let layer = rows[placement.index] ?? CATextLayer()
+            let existed = rows[placement.index] != nil
+            let oldPosition = layer.presentation()?.position ?? layer.position
+            let oldOpacity = layer.presentation()?.opacity ?? layer.opacity
+            layer.contentsScale = root.contentsScale
+            layer.isWrapped = true
+            layer.truncationMode = .end
+            layer.string = NSAttributedString(string: LyricsLayout.text(state, at: placement.index), attributes: LyricsLayout.attributes(size))
+            layer.frame = placement.rect.offsetBy(dx: -area.minX, dy: -area.minY)
+            layer.opacity = placement.opacity
+            if !existed { lyricClip.addSublayer(layer); rows[placement.index] = layer }
+            if animate && existed {
+                let move = CABasicAnimation(keyPath: "position")
+                move.fromValue = NSValue(point: oldPosition); move.toValue = NSValue(point: layer.position)
+                move.duration = 0.55; move.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                layer.add(move, forKey: "lyrics-scroll")
+                let fade = CABasicAnimation(keyPath: "opacity")
+                fade.fromValue = oldOpacity; fade.toValue = placement.opacity
+                fade.duration = 0.45; fade.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                layer.add(fade, forKey: "lyrics-emphasis")
+            } else { layer.removeAllAnimations() }
+        }
+        CATransaction.commit(); CATransaction.flush()
     }
 }
 final class Frames {
@@ -37,12 +95,22 @@ final class Frames {
     var revision = ""
     var timer: Timer?
     var mode = "desktop"
+    var lyricsState: LyricsFrame?
+    var lyricsMode = ""
     func start() {
         guard timer == nil else { return }
         load()
-        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in self.load() }
+        timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { _ in self.load() }
+    }
+    func updateLyrics() {
+        let state = (try? Data(contentsOf: frameDirectory.appendingPathComponent("lyrics.json"))).flatMap { try? JSONDecoder().decode(LyricsFrame.self, from: $0) }
+        let changed = state != lyricsState || lyricsMode != mode
+        lyricsState = state; lyricsMode = mode
+        for surface in surfaces.values { surface.showLyrics(state, visible: mode == "album") }
+        if changed { heartbeat() }
     }
     func load() {
+        defer { updateLyrics() }
         let state = (try? Data(contentsOf: frameDirectory.appendingPathComponent("mode.json"))).flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]
         mode = (state?["locked"] as? Bool == true) ? "album" : "desktop"
         let url = frameDirectory.appendingPathComponent(mode == "album" ? "current.png" : "desktop.png")
@@ -60,7 +128,7 @@ final class Frames {
         heartbeat()
     }
     func heartbeat() {
-        let info: [String: Any] = ["mode": mode, "pid": ProcessInfo.processInfo.processIdentifier, "surfaces": surfaces.count, "revision": revision, "time": Date().timeIntervalSince1970]
+        let info: [String: Any] = ["mode": mode, "pid": ProcessInfo.processInfo.processIdentifier, "surfaces": surfaces.count, "revision": revision, "time": Date().timeIntervalSince1970, "lyricsIndex": lyricsState?.activeIndex ?? -1, "lyricsRows": surfaces.values.first?.rows.count ?? 0, "animatedLyrics": true]
         if let data = try? JSONSerialization.data(withJSONObject: info) {
             try? data.write(to: frameDirectory.appendingPathComponent("renderer-status.json"), options: .atomic)
         }
@@ -133,6 +201,7 @@ final class Handler: NSObject, WallpaperExtensionXPCProtocol {
             surface.root.frame = CGRect(origin: .zero, size: size); surface.root.contentsScale = scale
             surface.root.contents = image
             CATransaction.commit(); CATransaction.flush()
+            frames.updateLyrics()
             frames.heartbeat()
             extensionLog("acquire context=\(surface.context.contextId) key=\(key)")
             reply(createRemoteContextXPC(contextId: surface.context.contextId), nil)
