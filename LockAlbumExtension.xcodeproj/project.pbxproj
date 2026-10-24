@@ -1,0 +1,21 @@
+// !$*UTF8*$!
+{ archiveVersion = 1; classes = {}; objectVersion = 56; objects = {
+000000000000000000000064 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Extension/Settings.swift"; sourceTree = SOURCE_ROOT; };
+0000000000000000000000C8 = {isa = PBXBuildFile; fileRef = 000000000000000000000064; };
+000000000000000000000065 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Extension/CodableShims.swift"; sourceTree = SOURCE_ROOT; };
+0000000000000000000000C9 = {isa = PBXBuildFile; fileRef = 000000000000000000000065; };
+000000000000000000000066 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Extension/LiveWallpaper.swift"; sourceTree = SOURCE_ROOT; };
+0000000000000000000000CA = {isa = PBXBuildFile; fileRef = 000000000000000000000066; };
+000000000000000000000067 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Extension/RuntimeHelpers.swift"; sourceTree = SOURCE_ROOT; };
+0000000000000000000000CB = {isa = PBXBuildFile; fileRef = 000000000000000000000067; };
+000000000000000000000001 = {isa = PBXProject; buildConfigurationList = 00000000000000000000000A; compatibilityVersion = "Xcode 14.0"; mainGroup = 000000000000000000000002; targets = (000000000000000000000003); };
+000000000000000000000002 = {isa = PBXGroup; children = (000000000000000000000064,000000000000000000000065,000000000000000000000066,000000000000000000000067, 000000000000000000000004); sourceTree = "<group>"; };
+000000000000000000000004 = {isa = PBXFileReference; explicitFileType = "wrapper.extensionkit-extension"; path = LockAlbumWallpaper.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+000000000000000000000003 = {isa = PBXNativeTarget; buildConfigurationList = 00000000000000000000000B; buildPhases = (000000000000000000000005, 000000000000000000000006); name = LockAlbumWallpaper; productName = LockAlbumWallpaper; productReference = 000000000000000000000004; productType = "com.apple.product-type.extensionkit-extension"; };
+000000000000000000000005 = {isa = PBXSourcesBuildPhase; files = (0000000000000000000000C8,0000000000000000000000C9,0000000000000000000000CA,0000000000000000000000CB); };
+000000000000000000000006 = {isa = PBXFrameworksBuildPhase; files = (); };
+00000000000000000000000A = {isa = XCConfigurationList; buildConfigurations = (00000000000000000000000C); defaultConfigurationName = Release; };
+00000000000000000000000B = {isa = XCConfigurationList; buildConfigurations = (00000000000000000000000D); defaultConfigurationName = Release; };
+00000000000000000000000C = {isa = XCBuildConfiguration; name = Release; buildSettings = {SDKROOT = macosx; MACOSX_DEPLOYMENT_TARGET = 26.0; }; };
+00000000000000000000000D = {isa = XCBuildConfiguration; name = Release; buildSettings = {PRODUCT_NAME = LockAlbumWallpaper; PRODUCT_BUNDLE_IDENTIFIER = local.lockalbum.app.wallpaper; SWIFT_VERSION = 5.0; SWIFT_OBJC_BRIDGING_HEADER = Extension/Bridge.h; ENABLE_APP_SANDBOX = YES; CODE_SIGN_ENTITLEMENTS = Extension/Entitlements.plist; CODE_SIGN_IDENTITY = "-"; CODE_SIGN_STYLE = Manual; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_FILE = Extension/Info.plist; CURRENT_PROJECT_VERSION = 2; MARKETING_VERSION = 0.2.0; SKIP_INSTALL = YES; }; };
+}; rootObject = 000000000000000000000001; }

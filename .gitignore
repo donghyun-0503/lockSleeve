@@ -1,0 +1,8 @@
+build/
+.DS_Store
+Backups/
+Assets/AppIcon-glass-v1.png
+**/xcuserdata/
+*.xcuserstate
+.env
+.env.*
