@@ -394,7 +394,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.status.title = "\(title) — \(artist)" + (lyricsMessage.isEmpty ? "" : " · " + lyricsMessage)
                 let lyricIndex = self.currentLyrics?.activeIndex(at: position) ?? -1
                 let renderKey = key + "\u{0}" + String(lyricIndex)
-                guard renderKey != self.lastKey || data != self.lastArtwork else { return }
+                guard renderKey != self.lastKey || data != self.lastArtwork || !self.wallpaperStore.extensionIsSelected() else { return }
                 if data != self.lastArtwork { self.cachedBackgroundKey = "" }
                 do {
                     try self.apply(image: image, title: title, artist: artist, lyrics: self.currentLyrics, lyricIndex: lyricIndex)
@@ -432,6 +432,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         try JSONEncoder().encode(state).write(to: frames.appendingPathComponent("lyrics.json"), options: .atomic)
         let preview = try render(image: image, title: title, artist: artist, size: size, lyrics: shownLyrics, lyricIndex: lyricIndex)
         try preview.write(to: folder.appendingPathComponent("preview.png"), options: .atomic)
+        // A user may have changed wallpaper since sync started, even on the same song.
+        if !wallpaperStore.extensionIsSelected() { try prepareDesktop() }
         try wallpaperStore.applyExtension(framesDirectory: frames)
 
     }

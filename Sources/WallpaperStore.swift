@@ -4,9 +4,17 @@ import Foundation
 /// surfaces that still point to an image owned by this application.
 final class WallpaperStore {
     let directory: URL
-    let storeURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/com.apple.wallpaper/Store/Index.plist")
+    let storeURL: URL
     var backupURL: URL { directory.appendingPathComponent("wallpaper-store-backup.plist") }
-    init(directory: URL) { self.directory = directory }
+    init(directory: URL, storeURL: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/com.apple.wallpaper/Store/Index.plist")) {
+        self.directory = directory; self.storeURL = storeURL
+    }
+    /// Live, user-selected surfaces win. Only our own surfaces need the backup.
+    func originalState(current: [String: Any], backup: [String: Any]?) -> [String: Any] {
+        map(current, original: backup) { surface, saved in
+            self.owned(surface) ? (saved ?? surface) : surface
+        }
+    }
 
     func dictionary(_ data: Data) throws -> [String: Any] {
         guard let result = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else {
@@ -40,10 +48,15 @@ final class WallpaperStore {
         return result
     }
     func originalImageURL() throws -> URL {
-        let source = FileManager.default.fileExists(atPath: backupURL.path) ? backupURL : storeURL
-        let root = try dictionary(Data(contentsOf: source))
+        let current = try dictionary(Data(contentsOf: storeURL))
+        let backup = try existingBackup()
+        let root = originalState(current: current, backup: backup)
         var result: URL?
-        _ = map(root, original: nil) { surface, _ in
+        // The active shared wallpaper takes precedence over the system default.
+        let ordered = ["AllSpacesAndDisplays", "Spaces", "Displays", "SystemDefault"]
+        for key in ordered {
+            guard let node = root[key] as? [String: Any] else { continue }
+            _ = map(node, original: nil) { surface, _ in
             if result == nil, let content = surface["Content"] as? [String: Any], let choices = content["Choices"] as? [[String: Any]] {
                 for choice in choices {
                     if let data = choice["Configuration"] as? Data, let config = try? self.dictionary(data),
@@ -53,17 +66,27 @@ final class WallpaperStore {
             }
             return surface
         }
+            if result != nil { break }
+        }
         guard let result else { throw NSError(domain: "LockAlbum", code: 31, userInfo: [NSLocalizedDescriptionKey: "이 모드는 정적인 이미지 배경이 필요합니다."]) }
         return result
+    }
+    func existingBackup() throws -> [String: Any]? {
+        guard FileManager.default.fileExists(atPath: backupURL.path) else { return nil }
+        return try dictionary(Data(contentsOf: backupURL))
     }
     func extensionIsSelected() -> Bool {
         guard let data = try? Data(contentsOf: storeURL), let root = try? dictionary(data) else { return false }
         var found = false
+        var allSelected = true
         _ = map(root, original: nil) { surface, _ in
-            if let content = surface["Content"] as? [String: Any], let choices = content["Choices"] as? [[String: Any]], choices.contains(where: { $0["Provider"] as? String == "local.lockalbum.app.wallpaper" }) { found = true }
+            found = true
+            let content = surface["Content"] as? [String: Any]
+            let choices = content?["Choices"] as? [[String: Any]] ?? []
+            if !choices.contains(where: { $0["Provider"] as? String == "local.lockalbum.app.wallpaper" }) { allSelected = false }
             return surface
         }
-        return found
+        return found && allSelected
     }
     func applyExtension(framesDirectory: URL) throws {
         if extensionIsSelected() { return }
@@ -88,7 +111,9 @@ final class WallpaperStore {
             return surface
         }
         guard count > 0 else { throw NSError(domain: "LockAlbum", code: 11, userInfo: [NSLocalizedDescriptionKey: "지원하지 않는 배경 설정 형식입니다."]) }
-        if !FileManager.default.fileExists(atPath: backupURL.path) { try data.write(to: backupURL, options: .atomic) }
+        let original = originalState(current: root, backup: try existingBackup())
+        let saved = try PropertyListSerialization.data(fromPropertyList: original, format: .binary, options: 0)
+        try saved.write(to: backupURL, options: .atomic)
         try write(updated)
     }
     func restore() throws {
